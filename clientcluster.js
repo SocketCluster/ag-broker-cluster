@@ -1,23 +1,15 @@
-var async = require('async');
-var EventEmitter = require('events').EventEmitter;
+const AsyncStreamEmitter = require('async-stream-emitter');
 
-var ClientCluster = function (clients) {
-  var self = this;
+function ClientCluster(clients) {
+  AsyncStreamEmitter.call(this);
 
-  var handleMessage = function () {
-    var args = Array.prototype.slice.call(arguments);
-    self.emit.apply(self, ['message'].concat(args));
-  };
+  let self = this;
 
-  clients.forEach((client) => {
-    client.on('message', handleMessage);
-  });
+  let i, method;
+  let client = clients[0];
+  let clientIds = [];
 
-  var i, method;
-  var client = clients[0];
-  var clientIds = [];
-
-  var clientAsyncInterface = [
+  let clientAsyncInterface = [
     'subscribe',
     'unsubscribe',
     'publish',
@@ -43,39 +35,51 @@ var ClientCluster = function (clients) {
     'end'
   ];
 
-  var clientUtils = [
+  let clientUtils = [
     'extractKeys',
     'extractValues'
   ];
 
   clients.forEach((client, i) => {
-    client.on('error', (error) => {
-      this.emit('error', error);
-    });
-    client.on('warning', (warning) => {
-      this.emit('warning', warning);
-    });
+    (async () => {
+      for await (let event of client.listener('error')) {
+        this.emit('error', event);
+      }
+    })();
+
+    (async () => {
+      for await (let event of client.listener('warning')) {
+        this.emit('warning', event);
+      }
+    })();
+
+    (async () => {
+      for await (let event of client.listener('message')) {
+        this.emit('message', event);
+      }
+    })();
+
     client.id = i;
     clientIds.push(i);
   });
 
   // Default mapper maps to all clients.
-  var mapper = function () {
+  let mapper = function () {
     return clientIds;
   };
 
   clientAsyncInterface.forEach((method) => {
     this[method] = function () {
-      var args = arguments;
-      var key = args[0];
-      var mapOutput = self.detailedMap(key, method);
-      var activeClients = mapOutput.targets;
+      let args = arguments;
+      let key = args[0];
+      let mapOutput = self.detailedMap(key, method);
+      let activeClients = mapOutput.targets;
 
       if (mapOutput.type === 'single') {
         return activeClients[0][method].apply(activeClients[0], args);
       }
 
-      var resultsPromises = activeClients.map((activeClient) => {
+      let resultsPromises = activeClients.map((activeClient) => {
         return activeClient[method].apply(activeClient, args);
       });
 
@@ -83,21 +87,21 @@ var ClientCluster = function (clients) {
     }
   });
 
-  var multiKeyClientInterface = [
+  let multiKeyClientInterface = [
     'expire',
     'unexpire'
   ];
 
   multiKeyClientInterface.forEach((method) => {
     this[method] = function () {
-      var args = arguments;
-      var keys = args[0];
-      var clientArgsMap = {};
+      let args = arguments;
+      let keys = args[0];
+      let clientArgsMap = {};
 
       keys.forEach((key) => {
-        var activeClients = self.map(key, method);
+        let activeClients = self.map(key, method);
         activeClients.forEach((client) => {
-          var clientId = client.id;
+          let clientId = client.id;
           if (clientArgsMap[clientId] == null) {
             clientArgsMap[clientId] = [];
           }
@@ -105,12 +109,12 @@ var ClientCluster = function (clients) {
         });
       });
 
-      var partArgs = Array.prototype.slice.call(args, 1);
+      let partArgs = Array.prototype.slice.call(args, 1);
 
-      var resultsPromises = Object.keys(clientArgsMap).map((clientId) => {
-        var activeClient = clients[clientId];
-        var firstArg = clientArgsMap[clientId];
-        var newArgs = [firstArg].concat(partArgs);
+      let resultsPromises = Object.keys(clientArgsMap).map((clientId) => {
+        let activeClient = clients[clientId];
+        let firstArg = clientArgsMap[clientId];
+        let newArgs = [firstArg].concat(partArgs);
         return activeClient[method].apply(activeClient, newArgs);
       });
 
@@ -131,15 +135,15 @@ var ClientCluster = function (clients) {
   };
 
   this.detailedMap = function (key, method) {
-    var result = mapper(key, method, clientIds);
-    var targets, type;
+    let result = mapper(key, method, clientIds);
+    let targets, type;
     if (typeof result === 'number') {
       type = 'single';
       targets = [clients[result % clients.length]];
     } else {
       type = 'multi';
       if (Array.isArray(result)) {
-        var dataClients = [];
+        let dataClients = [];
         result.forEach((res) => {
           dataClients.push(clients[res % clients.length]);
         });
@@ -155,8 +159,15 @@ var ClientCluster = function (clients) {
   this.map = function (key, method) {
     return self.detailedMap(key, method).targets;
   };
-};
 
-ClientCluster.prototype = Object.create(EventEmitter.prototype);
+  this.destroy = function () {
+    clients.forEach((client) => {
+      client.closeAllListeners();
+      client.end();
+    });
+  };
+}
+
+ClientCluster.prototype = Object.create(AsyncStreamEmitter.prototype);
 
 module.exports.ClientCluster = ClientCluster;
