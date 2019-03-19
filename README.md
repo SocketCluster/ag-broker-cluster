@@ -1,4 +1,4 @@
-sc-broker-cluster
+ag-broker-cluster
 =========
 
 Realtime clustered broker engine for SocketCluster

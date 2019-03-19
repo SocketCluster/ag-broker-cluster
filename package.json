@@ -1,6 +1,6 @@
 {
-  "name": "sc-broker-cluster",
-  "version": "8.0.0",
+  "name": "ag-broker-cluster",
+  "version": "1.0.0",
   "description": "Realtime clustering engine",
   "keywords": [
     "broker",
@@ -20,15 +20,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/SocketCluster/sc-broker-cluster.git"
+    "url": "git://github.com/SocketCluster/ag-broker-cluster.git"
   },
   "dependencies": {
-    "async-stream-emitter": "^1.1.0",
-    "sc-broker": "^7.0.2",
+    "async-stream-emitter": "^3.0.3",
+    "ag-broker": "^1.0.0",
     "sc-channel": "^2.0.0",
     "sc-errors": "^2.0.0",
     "sc-hasher": "^1.0.1",
-    "stream-demux": "^4.0.4"
+    "stream-demux": "^7.0.1"
   },
   "main": "index",
   "engines": {

@@ -1,8 +1,8 @@
 const StreamDemux = require('stream-demux');
 const AsyncStreamEmitter = require('async-stream-emitter');
-const scBroker = require('sc-broker');
+const agBroker = require('ag-broker');
 const ClientCluster = require('./clientcluster').ClientCluster;
-const SCChannel = require('sc-channel');
+const SCChannel = require('sc-channel'); // TODO 2: Use ag-channel instead
 const hash = require('sc-hasher').hash;
 
 const scErrors = require('sc-errors');
@@ -84,6 +84,7 @@ AbstractDataClient.prototype.extractValues = function (object) {
   return this._dataClient.extractValues(object);
 };
 
+// TODO 2: Rename to AGExchange
 function SCExchange(privateClientCluster, publicClientCluster, ioClusterClient) {
   AbstractDataClient.call(this, publicClientCluster);
 
@@ -307,7 +308,7 @@ function Server(options) {
     let launchServer = async (i, isRespawn) => {
       let socketPath = options.brokers[i];
 
-      let dataServer = scBroker.createServer({
+      let dataServer = agBroker.createServer({
         brokerId: i,
         debug: startDebugPort ? startDebugPort + i : null,
         inspect: startInspectPort ? startInspectPort + i : null,
@@ -430,7 +431,7 @@ function Client(options) {
   let dataClients = [];
 
   options.brokers.forEach((socketPath) => {
-    let dataClient = scBroker.createClient({
+    let dataClient = agBroker.createClient({
       socketPath: socketPath,
       ...options
     });
@@ -637,6 +638,7 @@ Client.prototype.unsubscribeSocket = function (socket, channel) {
   return this._dropUnusedSubscriptions(channel);
 };
 
+// TODO 2: Rename to setAGServer
 Client.prototype.setSCServer = function (scServer) {
   this.scServer = scServer;
 };
